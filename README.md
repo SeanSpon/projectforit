@@ -32,6 +32,12 @@ Built with React, TypeScript, Vinext (Next.js App Router APIs on Vite), Tailwind
 
 Schema: `db/schema.ts`. Migration: `drizzle-neon/`. API: `app/api/household/route.ts`. Domain validation: `lib/actions.ts`.
 
+## Vercel
+
+Import `SeanSpon/projectforit`. The checked-in `vercel.json` selects Next.js, builds with `pnpm run build:vercel`, and serves `.next`. The database adapter uses the server-only `DATABASE_URL` environment variable on Vercel. Add your Neon connection string under Project Settings → Environment Variables for Production and Preview, then redeploy. The existing Cloudflare build remains available through `pnpm build`.
+
+Keep Vercel Deployment Protection enabled for this shared demo household.
+
 ## Prototype scope
 
 This is a private demonstration. Every visitor acts as Alex in one shared fictional household; other roommates' votes are seeded examples. The calendar uses a labeled sample week in September 2026. Settlement buttons update the ledger only. There is no payment processing, messaging, or AI service.
