@@ -6,7 +6,7 @@ export const people = [
   { id: "maya", name: "Maya", initials: "MB", color: "pink" },
   { id: "eli", name: "Eli", initials: "EF", color: "peach" },
 ];
-export type View = "Overview" | "Chores" | "Expenses" | "Shared spaces" | "House rules";
+export type View = "Overview" | "Chores" | "Expenses" | "Shared spaces" | "House rules" | "How to use";
 export type Chore = { id: string; title: string; person: string; date: string; area: string; minutes: number; done: boolean };
 export type Expense = { id: string; title: string; cents: number; paidBy: string; category: string; date: string; settledBy: string[] };
 export type Booking = { id: string; title: string; space: string; person: string; date: string; start: string; end: string };
@@ -60,4 +60,4 @@ export function bookingConflict(b: Pick<Booking, "space" | "date" | "start" | "e
   return bookings.some(item => item.date === b.date && item.space === b.space && b.start < item.end && b.end > item.start);
 }
 export function timeLabel(time: string) { const [h,m] = time.split(":").map(Number); return `${h % 12 || 12}${m ? `:${String(m).padStart(2,"0")}` : ""} ${h >= 12 ? "PM" : "AM"}`; }
-export function dateLabel(date: string) { return date === TODAY ? "Today" : date === "2026-09-17" ? "Tomorrow" : new Date(date + "T12:00:00Z").toLocaleDateString("en-US", { month:"short", day:"numeric", timeZone:"UTC" }); }
+export function dateLabel(date: string) { const today=new Date().toISOString().slice(0,10);const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);return date === today ? "Today" : date === tomorrow ? "Tomorrow" : new Date(date + "T12:00:00Z").toLocaleDateString("en-US", { month:"short", day:"numeric", timeZone:"UTC" }); }

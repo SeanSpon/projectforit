@@ -1,2 +1,2 @@
-import RoomieApp from "@/components/roomie-app";
-export default function Home() { return <RoomieApp />; }
+import RoomieGate from "@/components/roomie-gate";
+export default function Home() { return <RoomieGate />; }

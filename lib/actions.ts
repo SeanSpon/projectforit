@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { ME, TODAY, bookingConflict, people, personName, type HouseState } from "./roomie";
+import { bookingConflict, people, personName, type HouseState } from "./roomie";
 const title = z.string().trim().min(1,"Give this a name.").max(80);
 const person = z.enum(["alex","jordan","maya","eli"]);
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s=>s>=TODAY && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0,10)===s,"Choose a valid date on or after September 16.");
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s=>s>=new Date().toISOString().slice(0,10) && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0,10)===s,"Choose a valid date today or later.");
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const id = z.string().min(1).max(100);
 export const actionSchema = z.discriminatedUnion("type",[
@@ -17,14 +17,14 @@ export const actionSchema = z.discriminatedUnion("type",[
   z.object({type:z.literal("vote_rule"),id,agreed:z.boolean()}).strict(),
 ]);
 export const requestSchema = z.object({version:z.number().int().nonnegative(),action:actionSchema}).strict();
-export function applyAction(current: HouseState, raw: unknown): HouseState {
+export function applyAction(current: HouseState, raw: unknown, ME: string): HouseState {
   const a = actionSchema.parse(raw); const s = structuredClone(current); let text = "";
   const nextId = () => crypto.randomUUID();
   switch(a.type){
     case "add_chore": { if(s.chores.length>=500)throw new Error("This concept supports up to 500 chores."); const {type,...values}=a; void type;s.chores.unshift({...values,id:nextId(),done:false});text=`added “${a.title}” for ${personName(a.person)}.`;break; }
     case "set_chore": { const c=s.chores.find(c=>c.id===a.id);if(!c)throw new Error("Chore not found.");c.done=a.done;text=`${a.done?"completed":"reopened"} ${c.title.toLowerCase()}.`;break; }
     case "rotate_chores": { s.chores=s.chores.map(c=>c.done?c:{...c,person:people[(people.findIndex(p=>p.id===c.person)+1)%4].id});text="rotated open chores one roommate forward.";break; }
-    case "add_expense": { if(s.expenses.length>=500)throw new Error("This concept supports up to 500 expenses.");const {type,...values}=a;void type;s.expenses.unshift({...values,id:nextId(),date:TODAY,settledBy:[]});text=`added ${a.title.toLowerCase()}, split four ways.`;break; }
+    case "add_expense": { if(s.expenses.length>=500)throw new Error("This concept supports up to 500 expenses.");const {type,...values}=a;void type;if(values.paidBy!==ME)throw new Error("You can only add expenses you paid.");s.expenses.unshift({...values,id:nextId(),date:new Date().toISOString().slice(0,10),settledBy:[]});text=`added ${a.title.toLowerCase()}, split four ways.`;break; }
     case "settle_expense": { const e=s.expenses.find(e=>e.id===a.id);if(!e||e.paidBy===ME)throw new Error("That share cannot be settled by you.");e.settledBy=a.settled?[...new Set([...e.settledBy,ME])]:e.settledBy.filter(p=>p!==ME);text=`${a.settled?"marked settled":"reopened"} their share of ${e.title.toLowerCase()}.`;break; }
     case "add_booking": { if(a.end<=a.start)throw new Error("End time must be after start time on the same day.");if(bookingConflict(a,s.bookings))throw new Error("That space is already booked during this time. Choose another slot.");if(s.bookings.length>=500)throw new Error("This concept supports up to 500 reservations.");const {type,...values}=a;void type;s.bookings.push({...values,id:nextId(),person:ME});text=`reserved the ${a.space.toLowerCase()} for ${a.title.toLowerCase()}.`;break; }
     case "cancel_booking": { const b=s.bookings.find(b=>b.id===a.id);if(!b||b.person!==ME)throw new Error("You can only cancel your own reservations.");s.bookings=s.bookings.filter(b=>b.id!==a.id);text=`canceled their ${b.title.toLowerCase()} reservation.`;break; }
