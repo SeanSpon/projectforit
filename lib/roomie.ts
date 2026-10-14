@@ -8,12 +8,24 @@ export const people = [
 ];
 export type View = "Overview" | "Chores" | "Expenses" | "Shared spaces" | "House rules" | "How to use";
 export type Chore = { id: string; title: string; person: string; date: string; area: string; minutes: number; done: boolean };
-export type Expense = { id: string; title: string; cents: number; paidBy: string; category: string; date: string; settledBy: string[] };
+export type Person = { id: string; name: string; initials: string; color: string; bio?: string };
+export const profilePerson = (id: string, name: string, index = 0, bio = ""): Person => ({ id, name, initials: name.split(/\s+/).map(p => p[0]).join("").slice(0,2).toUpperCase(), color: ["lime","blue","pink","peach"][index % 4], bio });
+export type Expense = { id: string; title: string; cents: number; paidBy: string; category: string; date: string; settledBy: string[]; participants?: string[] };
 export type Booking = { id: string; title: string; space: string; person: string; date: string; start: string; end: string };
 export type Rule = { id: string; title: string; detail: string; votes: string[]; category: string };
 export type Activity = { id: string; person: string; text: string; when: string };
 export type HouseState = { chores: Chore[]; expenses: Expense[]; bookings: Booking[]; rules: Rule[]; activity: Activity[] };
-export type Snapshot = { state: HouseState; version: number };
+export type Snapshot = { state: HouseState; version: number; household: { id: string; name: string; inviteCode: string }; members: Person[] };
+export const emptyState = (): HouseState => ({ chores: [], expenses: [], bookings: [], rules: [], activity: [] });
+export function demoSnapshot(): Snapshot {
+  const state = structuredClone(seedState);
+  const today = new Date().toISOString().slice(0,10);
+  const shift = (date: string) => new Date(Date.parse(date + "T12:00:00Z") + Date.parse(today) - Date.parse(TODAY)).toISOString().slice(0,10);
+  state.chores.forEach(c => c.date = shift(c.date));
+  state.bookings.forEach(b => b.date = shift(b.date));
+  state.expenses.forEach(e => { e.date = shift(e.date); e.participants = people.map(p => p.id); });
+  return { state, version: 0, members: people, household: { id: "demo", name: "Maple House", inviteCode: "DEMO" } };
+}
 export const seedState: HouseState = {
   chores: [
     { id: "c1", title: "Take out the recycling", person: "alex", date: TODAY, area: "Kitchen", minutes: 5, done: false },
@@ -49,13 +61,14 @@ export const seedState: HouseState = {
 };
 export const personName = (id: string) => people.find(p => p.id === id)?.name ?? "Roommate";
 export const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-export function shareFor(cents: number, person: string) {
-  const index = people.findIndex(p => p.id === person);
-  if (index < 0 || !Number.isSafeInteger(cents) || cents < 0) throw new Error("Invalid split");
-  return Math.floor(cents / people.length) + (index < cents % people.length ? 1 : 0);
+export function shareFor(cents: number, person: string, participants: string[] = people.map(p => p.id)) {
+  const index = participants.indexOf(person);
+  if (index < 0) return 0;
+  if (!participants.length || !Number.isSafeInteger(cents) || cents < 0) throw new Error("Invalid split");
+  return Math.floor(cents / participants.length) + (index < cents % participants.length ? 1 : 0);
 }
-export const amountOwed = (expenses: Expense[], person: string) => expenses.filter(e => e.paidBy !== person && !e.settledBy.includes(person)).reduce((sum,e) => sum + shareFor(e.cents, person), 0);
-export const amountReceivable = (expenses: Expense[], person: string) => expenses.filter(e => e.paidBy === person).reduce((sum,e) => sum + people.filter(p => p.id !== person && !e.settledBy.includes(p.id)).reduce((s,p) => s + shareFor(e.cents, p.id), 0), 0);
+export const amountOwed = (expenses: Expense[], person: string, members: Person[] = people) => expenses.filter(e => e.paidBy !== person && !e.settledBy.includes(person)).reduce((sum,e) => sum + shareFor(e.cents, person, e.participants ?? members.map(p => p.id)), 0);
+export const amountReceivable = (expenses: Expense[], person: string, members: Person[] = people) => expenses.filter(e => e.paidBy === person).reduce((sum,e) => sum + (e.participants ?? members.map(p => p.id)).filter(p => p !== person && !e.settledBy.includes(p)).reduce((s,p) => s + shareFor(e.cents, p, e.participants ?? members.map(p => p.id)), 0), 0);
 export function bookingConflict(b: Pick<Booking, "space" | "date" | "start" | "end">, bookings: Booking[]) {
   return bookings.some(item => item.date === b.date && item.space === b.space && b.start < item.end && b.end > item.start);
 }

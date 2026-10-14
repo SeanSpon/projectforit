@@ -11,16 +11,16 @@ const digest = async (value: string) => hex(await crypto.subtle.digest("SHA-256"
 export async function hashPassword(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 210000, hash: "SHA-256" }, key, 256);
-  return `pbkdf2:210000:${hex(salt.buffer)}:${hex(bits)}`;
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, key, 256);
+  return `pbkdf2:100000:${hex(salt.buffer)}:${hex(bits)}`;
 }
 
 export async function verifyPassword(password: string, saved: string) {
   const [algorithm, count, saltHex, hash] = saved.split(":");
-  if (algorithm !== "pbkdf2" || count !== "210000" || !saltHex || !hash) return false;
+  if (algorithm !== "pbkdf2" || !["100000", "210000"].includes(count) || !saltHex || !hash) return false;
   const salt = Uint8Array.from(saltHex.match(/../g) ?? [], byte => parseInt(byte, 16));
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const actual = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 210000, hash: "SHA-256" }, key, 256));
+  const actual = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: Number(count), hash: "SHA-256" }, key, 256));
   const expected = Uint8Array.from(hash.match(/../g) ?? [], byte => parseInt(byte, 16));
   if (actual.length !== expected.length) return false;
   let difference = 0;
@@ -32,7 +32,7 @@ export async function currentUser() {
   const token = (await cookies()).get(cookieName)?.value;
   if (!token) return null;
   const db = getNeonDb();
-  const [result] = await db.select({ id: users.id, email: users.email, person: users.person })
+  const [result] = await db.select({ id: users.id, email: users.email, person: users.person, name: users.name, bio: users.bio })
     .from(sessions).innerJoin(users, eq(sessions.userId, users.id))
     .where(and(eq(sessions.tokenHash, await digest(token)), gt(sessions.expiresAt, new Date())));
   return result ?? null;
