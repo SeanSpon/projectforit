@@ -38,11 +38,11 @@ export async function POST(request: Request) {
       const rows = await db.insert(users).values({ id, email: value.email, person: id, name: value.name, passwordHash: await hashPassword(value.password) }).onConflictDoNothing().returning({ id: users.id });
       if (!rows.length) return reply({ error: "That email already has an account. Sign in instead." }, 409);
       await startSession(id, request);
-      return reply({ user: { id, email: value.email, person: id, name: value.name, bio: "" } }, 201);
+      return reply({ user: { id, email: value.email, person: id, name: value.name, bio: "", role: "student" } }, 201);
     }
     const [user] = await db.select().from(users).where(eq(users.email, value.email));
     if (!user || !(await verifyPassword(value.password, user.passwordHash))) return reply({ error: "Wrong email or password." }, 401);
     await startSession(user.id, request);
-    return reply({ user: { id: user.id, email: user.email, person: user.person, name: user.name, bio: user.bio } });
+    return reply({ user: { id: user.id, email: user.email, person: user.person, name: user.name, bio: user.bio, role: user.role } });
   } catch { return reply({ error: "Could not connect to the database. Try again." }, 503); }
 }

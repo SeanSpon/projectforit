@@ -1,6 +1,6 @@
 # Roomie
 
-A working roommate app concept for a semester project. Maple House is a fictional apartment with Alex, Jordan, Maya, and Eli.
+A roommate and residential-community app for a semester project. Real accounts create private rooms; RAs manage connected room groups. A separate demo uses fictional Maple House residents.
 
 ## Features
 
@@ -15,9 +15,9 @@ A working roommate app concept for a semester project. Maple House is a fictiona
 
 ## How to use
 
-Create an account and claim one available Maple House profile (Alex, Jordan, Maya, or Eli). Each profile can be claimed once. Sign in again with that email and password. All four profiles share the same saved household. Add and finish chores, record only expenses you paid, reserve spaces, and vote on rules. Settlement is only a ledger marker; pay each other outside the app.
+Create an account with your name, email, and password. Create your own household or join one with a roommate's 16-character invite code. Each household keeps its chores, expenses, reservations and agreements separate. Edit your profile and switch rooms from **Rooms & profile**.
 
-The initial household records are fictional examples. This class-project version has one four-person household and no password-reset email flow. Use a password you do not use anywhere else.
+The **Try the full demo** button opens sample household data without saving it to your real account. There is no password-reset email flow yet.
 
 ## Run locally
 
@@ -46,12 +46,44 @@ Import `SeanSpon/projectforit`. The checked-in `vercel.json` selects Next.js, bu
 
 Keep Vercel Deployment Protection enabled if you want access limited to invited viewers. App accounts still require access to the site itself.
 
-## Prototype scope
+## Live student and RA communities
 
-This is a class demonstration with four fixed roommate slots and one shared fictional household. Initial votes are seeded examples. Settlement buttons update the ledger only. There is no payment processing, messaging, or AI service. Before using it for a real household, add invitations, password recovery, rate limiting, and separate household creation.
+The signed-in app now uses Neon for RA groups, room connections, announcements, room conversations, issue reports, and role invitations. Both Vercel projects build this GitHub repository from `main`. Use `projectforit-three.vercel.app` as the main address; the existing `projectforit-64zu.vercel.app` deployment remains supported.
 
-## Student and RA room-group prototype
+### Students
 
-Open `/prototype/index.html` or choose **Explore Student & RA room groups** from the login screen. This separately labeled, browser-local prototype demonstrates Morgens Hall Floor 9 with rooms 901–912, student room setup, chores, expenses, RA messages, issue reports, announcements, and RA room details. It does not grant RA permissions or send real messages. Existing signed-in household accounts continue to use the server-backed app.
+1. Create an account and a room, or join a roommate using the room's invite code.
+2. Open the room and choose **Your RA & community**.
+3. The room creator enters the **RA group code** supplied by the RA. All room members are then connected to that group.
+4. Send room messages, submit reports, and read floor announcements. Reports and conversations are shared with that room's residents and assigned RA.
 
-Prototype source: `public/prototype/`. Screenshots and the proposed server data model: `docs/ra-prototype/`. Use **Reset demo** to return to the sample data.
+### RAs
+
+RA status is invitation-only. The app owner issues an invitation to a specific email from a trusted terminal with production database access:
+
+```sh
+node --env-file=.env.local scripts/invite-ra.mjs person@example.com
+```
+
+The one-use code expires after seven days. The recipient signs in with the invited email, opens **Activate RA account** under **Rooms & profile**, and enters the code. They then open **RA dashboard**, create a group such as **Morgens 900 RA**, and share its group connection code with room creators. The account's role does not itself grant access to rooms; it can manage only groups it owns and rooms explicitly connected to those groups. This establishes app-owner authorization, not university identity verification.
+
+The RA sees room residents/contact details, submitted reports, room conversations and group announcements. Chores, private household expenses, bookings and house rules remain restricted to household members. Messages stay in the app; this app does not send email/SMS or process payments. Reports are not monitored for emergencies.
+
+### Sync and deployment
+
+Community screens and household data refresh every 15 seconds while the page is visible. Actions save before reporting success; existing household writes retain optimistic version checks. Vercel uses the server-only `DATABASE_URL`. Production must point to the production Neon branch; preview/development should use an isolated branch. Run `pnpm db:migrate` before deploying schema changes. Migrations add tables/columns without resetting existing accounts or household data.
+
+### Verification
+
+`pnpm typecheck` and `pnpm run build:vercel` check the production build. The API integration suite exercises the actual route handlers and real Neon data; its in-process mode adapts Next's request-cookie context for isolated execution:
+
+```sh
+# Use an isolated Neon branch in .env.local, never production.
+ROOMIE_TEST_IN_PROCESS=1 ROOMIE_TEST_DB_HOST=your-test-branch-host node --env-file=.env.local scripts/test-community.mjs
+```
+
+The suite covers signups, sessions, single-use email-bound RA invitations, group creation, room owner connection, messages, status changes, announcements, database persistence, cross-room isolation, and rejection of unauthorized writes. Test records stay on the isolated branch.
+
+### Design prototype
+
+The original browser-local prototype remains at `/prototype/index.html`, with its original ten screenshots under `docs/ra-prototype/`. It is labeled as a prototype and does not connect to live accounts; use the signed-in app for real rooms and RA communication.

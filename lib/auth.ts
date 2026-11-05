@@ -32,7 +32,7 @@ export async function currentUser() {
   const token = (await cookies()).get(cookieName)?.value;
   if (!token) return null;
   const db = getNeonDb();
-  const [result] = await db.select({ id: users.id, email: users.email, person: users.person, name: users.name, bio: users.bio })
+  const [result] = await db.select({ id: users.id, email: users.email, person: users.person, name: users.name, bio: users.bio, role: users.role })
     .from(sessions).innerJoin(users, eq(sessions.userId, users.id))
     .where(and(eq(sessions.tokenHash, await digest(token)), gt(sessions.expiresAt, new Date())));
   return result ?? null;
