@@ -88,4 +88,4 @@ The suite covers signups, sessions, single-use email-bound RA invitations, group
 
 ### Student and RA interface
 
-The Student and RA experience is part of the main app at `/`, with separate sign-in and account-creation flows and a persistent portal switch. `/prototype/index.html` now directs visitors to the main app. There is no separate mockup linked from the login screen. The ten design screenshots remain under `docs/ra-prototype/screenshots/` as project documentation.
+The existing green Roomie design is retained. The Student and RA experience is part of the main app at `/`, with Student and RA account choices in the existing Roomie interface. `/prototype/index.html` now directs visitors to the main app. There is no separate mockup linked from the login screen. The ten design screenshots remain under `docs/ra-prototype/screenshots/` as project documentation.
