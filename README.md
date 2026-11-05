@@ -15,6 +15,8 @@ A roommate and residential-community app for a semester project. Real accounts c
 
 ## How to use
 
+Choose **Student** or **Resident Assistant** on Roomie’s sign-in screen. Student accounts open their rooms. Verified RA accounts open the RA dashboard immediately; new or unverified RA accounts finish invitation verification within the RA portal. Both portals use the same real account session and Neon backend. Switch portals from the app header.
+
 Create an account with your name, email, and password. Create your own household or join one with a roommate's 16-character invite code. Each household keeps its chores, expenses, reservations and agreements separate. Edit your profile and switch rooms from **Rooms & profile**.
 
 The **Try the full demo** button opens sample household data without saving it to your real account. There is no password-reset email flow yet.
@@ -84,6 +86,6 @@ ROOMIE_TEST_IN_PROCESS=1 ROOMIE_TEST_DB_HOST=your-test-branch-host node --env-fi
 
 The suite covers signups, sessions, single-use email-bound RA invitations, group creation, room owner connection, messages, status changes, announcements, database persistence, cross-room isolation, and rejection of unauthorized writes. Test records stay on the isolated branch.
 
-### Design prototype
+### Student and RA interface
 
-The original browser-local prototype remains at `/prototype/index.html`, with its original ten screenshots under `docs/ra-prototype/`. It is labeled as a prototype and does not connect to live accounts; use the signed-in app for real rooms and RA communication.
+The Student and RA experience is part of the main app at `/`, with separate sign-in and account-creation flows and a persistent portal switch. `/prototype/index.html` now directs visitors to the main app. There is no separate mockup linked from the login screen. The ten design screenshots remain under `docs/ra-prototype/screenshots/` as project documentation.

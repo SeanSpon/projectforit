@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Home, MessageCircle, ShieldCheck, Users, RefreshCw, ArrowLeft, Send, Megaphone, Building2 } from "lucide-react";
+import PortalSwitch, { type Portal } from "./portal-switch";
 import type { RoomieUser } from "./roomie-gate";
 
 type Group = { id: string; name: string; building: string; floor: string; inviteCode?: string; raName?: string };
@@ -13,7 +14,7 @@ export async function communityApi<T = {id:string}>(query = "", payload?: unknow
   const response = await fetch("/api/community" + query, payload ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) } : { cache: "no-store" });
   const data = await response.json() as T & {error?:string}; if (!response.ok) throw new Error(data.error || "Could not connect to your community."); return data;
 }
-export default function CommunityApp({ user, roomId, back }: { user: RoomieUser; roomId?: string; back: () => void }) {
+export default function CommunityApp({ user, roomId, back, onPortal, signOut }: { user: RoomieUser; roomId?: string; back: () => void; onPortal: (portal: Portal) => void; signOut: () => void }) {
   const [groups, setGroups] = useState<Group[]>([]), [groupId, setGroupId] = useState("");
   const [data, setData] = useState<Community | null>(null), [selectedRoom, setSelectedRoom] = useState(roomId ?? "");
   const [error, setError] = useState(""), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [saved, setSaved] = useState("");
@@ -52,7 +53,7 @@ export default function CommunityApp({ user, roomId, back }: { user: RoomieUser;
   const currentRoom = data?.rooms.find(r => r.id === (roomId || selectedRoom));
   const scopedReports = data?.reports.filter(r => !selectedRoom || r.householdId === selectedRoom) ?? [];
   const scopedMessages = data?.messages.filter(m => m.roomId === (roomId || selectedRoom)) ?? [];
-  return <main className="community-shell"><header className="community-top"><button onClick={back}><ArrowLeft size={16}/>Rooms &amp; profile</button><a href="/" className="community-brand"><Home/>roomie.</a><span>{roomId ? "STUDENT COMMUNITY" : "RA PORTAL"}</span></header>
+  return <main className="community-shell"><header className="community-top"><button onClick={back}><ArrowLeft size={16}/>Rooms &amp; profile</button><a href="/" className="community-brand"><Home/>roomie.</a><PortalSwitch value={roomId ? "student" : "ra"} onChange={onPortal}/><button onClick={signOut}>Sign out</button></header>
     <div className="community-heading"><div><p className="eyebrow">{data?.group ? `${data.group.building} · Floor ${data.group.floor}` : "YOUR RESIDENTIAL COMMUNITY"}</p><h1>{roomId ? "Your room. Your RA." : data?.group?.name || "Your RA room groups"}</h1><p className="muted">{roomId ? "Reach your assigned RA, report concerns, and catch floor updates." : "Bring your assigned rooms together and stay connected with residents."}</p></div><button className="community-secondary" disabled={busy || loading} onClick={() => void refresh()}><RefreshCw size={16}/>Refresh</button></div>
     {error && <div className="community-error" role="alert">{error}<button onClick={() => void refresh()}>Try again</button></div>}{saved && <p role="status" className="community-success">{saved}</p>}
     {loading && <section className="panel" role="status">Loading your community…</section>}
