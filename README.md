@@ -6,10 +6,10 @@ A roommate and residential-community app for a semester project. Real accounts c
 
 - Dashboard with household progress and activity.
 - Assign, complete, reopen, and rotate chores.
-- Split expenses four ways with exact penny allocation; record settlements without sending money.
+- Split expenses among current roommates with exact penny allocation; record settlements without sending money.
 - Reserve shared spaces with server-enforced overlap checks.
 - Propose house rules and record agreement.
-- Email/password sign-in with one account per demo roommate; sessions use secure, HTTP-only cookies.
+- Email/password sign-in with individual accounts; sessions use secure, HTTP-only cookies.
 - Neon Postgres persistence, server validation, and version checks against lost updates across tabs.
 - In-app **How to use** guide.
 
@@ -21,7 +21,7 @@ The **Try the full demo** button opens sample household data without saving it t
 
 ## Run locally
 
-Requires Node.js 22.13+ and pnpm 11.25.0.
+Requires Node.js 24.x and pnpm 11.25.0.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -42,7 +42,7 @@ Schema: `db/schema.ts`. Migration: `drizzle-neon/`. API: `app/api/household/rout
 
 ## Vercel
 
-Import `SeanSpon/projectforit`. The checked-in `vercel.json` selects Next.js, builds with `pnpm run build:vercel`, and serves `.next`. The database adapter uses the server-only `DATABASE_URL` environment variable on Vercel. Add your Neon connection string under Project Settings → Environment Variables for Production and Preview, then redeploy. The existing Cloudflare build remains available through `pnpm build`.
+Import `SeanSpon/projectforit`. The checked-in `vercel.json` selects Next.js, builds with `pnpm run build:vercel`, and serves `.next`. The database adapter uses the server-only `DATABASE_URL` environment variable on Vercel. Set Production DATABASE_URL to the production Neon branch and Preview DATABASE_URL to an isolated preview branch, then redeploy. The existing Cloudflare build remains available through `pnpm build`.
 
 Keep Vercel Deployment Protection enabled if you want access limited to invited viewers. App accounts still require access to the site itself.
 
