@@ -19,7 +19,7 @@ export async function installRouteHarness(origin) {
   const cookiesShim = resolve(dir, "cookies.mjs");
   await writeFile(cookiesShim, "export const cookies = () => globalThis.__roomieTestCookies();\n");
   const handlers = new Map();
-  for (const route of ["auth", "rooms", "household", "community", "health"]) {
+  for (const route of ["auth", "rooms", "household", "community", "health", "messages"]) {
     const outfile = resolve(dir, route + ".mjs");
     await build({ entryPoints: [`app/api/${route}/route.ts`], outfile, bundle: true, platform: "node", format: "esm", packages: "external", alias: { "next/headers": cookiesShim, "cloudflare:workers": resolve("db/node-env.ts") }, logLevel: "silent" });
     handlers.set(`/api/${route}`, await import(pathToFileURL(outfile)));

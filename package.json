@@ -7,14 +7,15 @@
   },
   "scripts": {
     "install:ci": "bash scripts/install-pnpm.sh",
-    "dev": "node scripts/run-framework.mjs dev",
+    "dev": "node scripts/dev-roomie.mjs",
     "build": "node scripts/run-framework.mjs build",
     "build:vercel": "next build --webpack",
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "node --env-file=.env.local scripts/migrate-neon.mjs"
+    "db:migrate": "node --env-file=.env.local scripts/migrate-neon.mjs",
+    "dev:cloudflare": "node scripts/run-framework.mjs dev"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -6,7 +6,7 @@ export const people = [
   { id: "maya", name: "Maya", initials: "MB", color: "pink" },
   { id: "eli", name: "Eli", initials: "EF", color: "peach" },
 ];
-export type View = "Overview" | "Chores" | "Expenses" | "Shared spaces" | "House rules" | "How to use";
+export type View = "Overview" | "Chores" | "Expenses" | "Shared spaces" | "House rules" | "Messages" | "How to use";
 export type Chore = { id: string; title: string; person: string; date: string; area: string; minutes: number; done: boolean };
 export type Person = { id: string; name: string; initials: string; color: string; bio?: string };
 export const profilePerson = (id: string, name: string, index = 0, bio = ""): Person => ({ id, name, initials: name.split(/\s+/).map(p => p[0]).join("").slice(0,2).toUpperCase(), color: ["lime","blue","pink","peach"][index % 4], bio });

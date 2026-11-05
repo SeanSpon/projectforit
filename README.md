@@ -1,91 +1,63 @@
 # Roomie
 
-A roommate and residential-community app for a semester project. Real accounts create private rooms; RAs manage connected room groups. A separate demo uses fictional Maple House residents.
+One roommate and floor-community app at `/`, preserving the original green Roomie interface. Existing Vercel project: `projectforit`; GitHub: `SeanSpon/projectforit`; production URL: https://projectforit-three.vercel.app.
 
-## Features
+## Student rooms
 
-- Dashboard with household progress and activity.
-- Assign, complete, reopen, and rotate chores.
-- Split expenses among current roommates with exact penny allocation; record settlements without sending money.
-- Reserve shared spaces with server-enforced overlap checks.
-- Propose house rules and record agreement.
-- Email/password sign-in with individual accounts; sessions use secure, HTTP-only cookies.
-- Neon Postgres persistence, server validation, and version checks against lost updates across tabs.
-- In-app **How to use** guide.
+Create a normal account, create an independent room, or join an assigned room with a student invitation. Every newly issued invitation contains 128 random bits. A room owner can regenerate or revoke invitations, remove members, and transfer ownership to a current roommate. The first invited resident to enter an unclaimed floor room becomes its owner; floor organizers never become roommates automatically. Codes are bearer invitations: give them only to assigned residents.
 
-## How to use
+The original chores, shared expenses, settlements, space reservations, rule proposals/votes, profiles, and demo remain. Private roommate messages are under **Messages**. Only current roommates can read private household data; a connected floor manager cannot join a managed room using its code.
 
-Choose **Student** or **Resident Assistant** on Roomie’s sign-in screen. Student accounts open their rooms. Verified RA accounts open the RA dashboard immediately; new or unverified RA accounts finish invitation verification within the RA portal. Both portals use the same real account session and Neon backend. Switch portals from the app header.
+**Rooms & profile** contains contact-sharing choices, role correction, room management, and permanent account deletion. Transfer shared rooms before deleting their owner account. Account deletion removes sessions, profile, authored requests/messages, and solo-owned rooms. Deleting a floor owner disbands their groups while preserving occupied student rooms and their private state.
 
-Create an account with your name, email, and password. Create your own household or join one with a roommate's 16-character invite code. Each household keeps its chores, expenses, reservations and agreements separate. Edit your profile and switch rooms from **Rooms & profile**.
+## Optional floor groups
 
-The **Try the full demo** button opens sample household data without saving it to your real account. There is no password-reset email flow yet.
+Any account can open the floor dashboard and create a group; there is no admin approval or RA activation code. The account role is a preference, not an authorization claim. Floor ownership is explicitly **unverified university RA status**.
 
-## Run locally
+A floor manager can create assigned rooms with unique student invitations and remove non-owner residents from connected rooms. Room owners must transfer ownership before removal; floor managers cannot transfer or claim ownership. To bring an existing independent room, its owner submits the separate floor connection code and an assigned room number. The floor manager must explicitly approve. Database uniqueness prevents two rooms claiming the same normalized label in one group. Any resident can disconnect their room; floor managers can disconnect managed rooms. Disconnection and reconnection reset room chore-sharing consent.
 
-Requires Node.js 24.x and pnpm 11.25.0.
+The integrated floor dashboard includes overview counts, room directory, resident names/bios and shared contacts, announcements, floor/room rules, maintenance photos/status/updates, private help, invitation management, and connection approvals. The app sends no email/SMS notifications; contact buttons open the device's email/phone application. Requests are internal Roomie records, not official university work orders.
+
+## Privacy and authorization
+
+- Expenses, financial information, private roommate messages, bookings, household activity, and individual chore assignments never enter the floor response.
+- Email and phone sharing default off and are evaluated by SQL at read time. Residents control their own choices.
+- A room owner can opt in to **aggregate** chore totals; any roommate can revoke. Individual chore detail sharing is deliberately unsupported.
+- Private help is visible only to its author and current connected floor manager. Maintenance is shared with that room's residents and current floor manager.
+- Session-derived actor IDs are supplied by server handlers. Client payloads cannot select an actor. Server-only Neon credentials are never exposed to the browser.
+- PostgreSQL functions enforce actor checks, contact projection, request visibility, ownership changes, and atomic floor approvals. Triggers prevent floor owners joining managed rooms and reset sharing when floor links change. Internal functions are revoked from PUBLIC.
+- Household mutations retain membership checks and optimistic version conflict protection. Membership and invitation mutations lock/version the household. Origin and input checks protect mutations.
+
+Legacy RA-invitation and residence-message records are preserved by the migration. Legacy room-wide RA conversations are no longer exposed through the new private-help interface. Their historical visibility is ambiguous, so they are not automatically converted into private threads.
+
+## Run and deploy
+
+Node 24.x, pnpm 11.25.0. Set the existing server-only `DATABASE_URL` in ignored `.env.local`; never use a `NEXT_PUBLIC_` database secret.
 
 ```sh
 pnpm install --frozen-lockfile
-cp .env.example .env.local
-# Set DATABASE_URL in .env.local to your Neon connection string.
-pnpm db:migrate # creates the household, user, and session tables
+pnpm db:migrate
 pnpm dev
-```
-
-```sh
 pnpm typecheck
-pnpm build
+pnpm run build:vercel
 ```
 
-Built with React, TypeScript, Vinext (Next.js App Router APIs on Vite), Tailwind, shadcn/ui, Drizzle ORM, and Neon. The bundled runtime supports Cloudflare Workers / Sites; set DATABASE_URL as a server-side secret when deploying. Never expose it in a NEXT_PUBLIC variable or commit .env.local.
+`db/schema.ts` and `drizzle-neon/` track schema changes. Migrations `0005` through `0007` add floor workflows and guards without resetting existing accounts or private household state. Labels on existing floor links are backfilled; preexisting duplicate labels receive an ID suffix to preserve both links.
 
-Schema: `db/schema.ts`. Migration: `drizzle-neon/`. API: `app/api/household/route.ts`. Domain validation: `lib/actions.ts`.
+Vercel uses the checked-in `vercel.json`, Next.js, and the existing production Neon connection. Apply migrations before releasing code. The retained Vinext/Cloudflare development build remains available through `pnpm build`. Do not create another Vercel project or a second Roomie app.
 
-## Vercel
+## Verification
 
-Import `SeanSpon/projectforit`. The checked-in `vercel.json` selects Next.js, builds with `pnpm run build:vercel`, and serves `.next`. The database adapter uses the server-only `DATABASE_URL` environment variable on Vercel. Set Production DATABASE_URL to the production Neon branch and Preview DATABASE_URL to an isolated preview branch, then redeploy. The existing Cloudflare build remains available through `pnpm build`.
-
-Keep Vercel Deployment Protection enabled if you want access limited to invited viewers. App accounts still require access to the site itself.
-
-## Live student and RA communities
-
-The signed-in app now uses Neon for RA groups, room connections, announcements, room conversations, issue reports, and role invitations. Both Vercel projects build this GitHub repository from `main`. Use `projectforit-three.vercel.app` as the main address; the existing `projectforit-64zu.vercel.app` deployment remains supported.
-
-### Students
-
-1. Create an account and a room, or join a roommate using the room's invite code.
-2. Open the room and choose **Your RA & community**.
-3. The room creator enters the **RA group code** supplied by the RA. All room members are then connected to that group.
-4. Send room messages, submit reports, and read floor announcements. Reports and conversations are shared with that room's residents and assigned RA.
-
-### RAs
-
-RA status is invitation-only. The app owner issues an invitation to a specific email from a trusted terminal with production database access:
+Run only against a separate Neon branch containing the migrated schema:
 
 ```sh
-node --env-file=.env.local scripts/invite-ra.mjs person@example.com
+ROOMIE_TEST_DB_HOST=your-isolated-branch-host node --env-file=.env.local scripts/test-full-system.mjs
 ```
 
-The one-use code expires after seven days. The recipient signs in with the invited email, opens **Activate RA account** under **Rooms & profile**, and enters the code. They then open **RA dashboard**, create a group such as **Morgens 900 RA**, and share its group connection code with room creators. The account's role does not itself grant access to rooms; it can manage only groups it owns and rooms explicitly connected to those groups. This establishes app-owner authorization, not university identity verification.
+Or use `node scripts/run-isolated-tests.mjs` and supply `{ "url": "<isolated connection>" }` on hidden stdin. The in-process harness adapts only Next's cookie request context; actual API handlers, session hashing, validation, and Neon SQL all execute. Results are written to ignored `.sites-runtime/full-system-test-results.json`. No user account or production data is used for destructive test cases.
 
-The RA sees room residents/contact details, submitted reports, room conversations and group announcements. Chores, private household expenses, bookings and house rules remain restricted to household members. Messages stay in the app; this app does not send email/SMS or process payments. Reports are not monitored for emergencies.
+Coverage includes normal signup/login session behavior, independent rooms, assigned-room claims, role correction, transfer/deletion, contact opt-in/revocation, permission denials, private-help isolation, maintenance attachments/updates/status, approval-based connections, code rotation/revocation, preserved household features, and state conflicts. Visual checks use fictional residents on the isolated branch.
 
-### Sync and deployment
+## Limits
 
-Community screens and household data refresh every 15 seconds while the page is visible. Actions save before reporting success; existing household writes retain optimistic version checks. Vercel uses the server-only `DATABASE_URL`. Production must point to the production Neon branch; preview/development should use an isolated branch. Run `pnpm db:migrate` before deploying schema changes. Migrations add tables/columns without resetting existing accounts or household data.
-
-### Verification
-
-`pnpm typecheck` and `pnpm run build:vercel` check the production build. The API integration suite exercises the actual route handlers and real Neon data; its in-process mode adapts Next's request-cookie context for isolated execution:
-
-```sh
-# Use an isolated Neon branch in .env.local, never production.
-ROOMIE_TEST_IN_PROCESS=1 ROOMIE_TEST_DB_HOST=your-test-branch-host node --env-file=.env.local scripts/test-community.mjs
-```
-
-The suite covers signups, sessions, single-use email-bound RA invitations, group creation, room owner connection, messages, status changes, announcements, database persistence, cross-room isolation, and rejection of unauthorized writes. Test records stay on the isolated branch.
-
-### Student and RA interface
-
-The existing green Roomie design is retained. The Student and RA experience is part of the main app at `/`, with Student and RA account choices in the existing Roomie interface. `/prototype/index.html` now directs visitors to the main app. There is no separate mockup linked from the login screen. The ten design screenshots remain under `docs/ra-prototype/screenshots/` as project documentation.
+No university identity verification, email verification, password-reset email, push/email/SMS delivery, multi-manager floor delegation, individual chore sharing, or official campus maintenance integration. Photos are resized/re-encoded by the client and stored privately in Neon with the request (maximum about 500 KB after encoding). The full browser-to-production flow must be checked separately from the isolated handler integration suite.
