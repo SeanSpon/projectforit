@@ -49,3 +49,9 @@ Keep Vercel Deployment Protection enabled if you want access limited to invited 
 ## Prototype scope
 
 This is a class demonstration with four fixed roommate slots and one shared fictional household. Initial votes are seeded examples. Settlement buttons update the ledger only. There is no payment processing, messaging, or AI service. Before using it for a real household, add invitations, password recovery, rate limiting, and separate household creation.
+
+## Student and RA room-group prototype
+
+Open `/prototype/index.html` or choose **Explore Student & RA room groups** from the login screen. This separately labeled, browser-local prototype demonstrates Morgens Hall Floor 9 with rooms 901–912, student room setup, chores, expenses, RA messages, issue reports, announcements, and RA room details. It does not grant RA permissions or send real messages. Existing signed-in household accounts continue to use the server-backed app.
+
+Prototype source: `public/prototype/`. Screenshots and the proposed server data model: `docs/ra-prototype/`. Use **Reset demo** to return to the sample data.

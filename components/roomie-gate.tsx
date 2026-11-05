@@ -44,6 +44,6 @@ export default function RoomieGate() {
     <label>Email<input name="email" type="email" autoComplete="email" required maxLength={200}/></label><label>Password<input name="password" type="password" autoComplete={mode==="signup"?"new-password":"current-password"} minLength={mode==="signup"?10:undefined} maxLength={128} required/></label>
     {mode==="signup"&&<small>Use at least 10 characters for your password.</small>}{error&&<p className="auth-error" role="alert">{error}</p>}<button disabled={busy}>{busy?"One sec…":mode==="login"?"Sign in":"Create account"}</button></form>
     <button className="auth-toggle" onClick={()=>{setMode(mode==="login"?"signup":"login");setError("");}}>{mode==="login"?"New here? Create an account":"Already have an account? Sign in"}</button>
-    <button className="auth-toggle" onClick={()=>setDemo(true)}>Try the full demo →</button><small>No signup needed for the demo. Changes stay in this preview.</small>
+    <button className="auth-toggle" onClick={()=>setDemo(true)}>Try the full demo →</button><a className="auth-toggle" href="/prototype/index.html?screen=welcome">Explore Student &amp; RA room groups →</a><small>No signup needed for the demo. Changes stay in this preview.</small>
   </section></main>;
 }
