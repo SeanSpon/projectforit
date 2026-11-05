@@ -168,7 +168,19 @@ export default function CommunityApp({
     [groupId, setGroupId] = useState(initial?.groupId ?? ""),
     [data, setData] = useState<Community | null>(initial?.data ?? null),
     [section, setSection] = useState<Section>(initial?.section ?? "Overview"),
-    [selectedRoom, setSelectedRoom] = useState("");
+    [selectedRoom, setSelectedRoom] = useState(""),
+    [residentSearch, setResidentSearch] = useState(""),
+    [requestStatus, setRequestStatus] = useState("All");
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("account");
+    url.searchParams.delete("room");
+    url.searchParams.delete("view");
+    if (roomId) url.searchParams.set("community", roomId);
+    else { url.searchParams.set("portal", "ra"); if (groupId) url.searchParams.set("group", groupId); else url.searchParams.delete("group"); }
+    url.searchParams.set("section", section);
+    window.history.replaceState(null, "", url);
+  }, [roomId, groupId, section]);
   const [loading, setLoading] = useState(!initial),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -177,44 +189,46 @@ export default function CommunityApp({
   const pending = useRef(false),
     generation = useRef(0);
   const query = roomId ? `?room=${roomId}` : groupId ? `?group=${groupId}` : "";
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     const v = ++generation.current;
     try {
       if (query) {
         const result = await communityApi<Community>(query);
-        if (v === generation.current) setData(result);
+        if (v === generation.current && !signal?.aborted) setData(result);
       } else {
         const result = await communityApi<{ groups: Group[] }>();
-        if (v === generation.current) setGroups(result.groups);
+        if (v === generation.current && !signal?.aborted) setGroups(result.groups);
       }
-      if (v === generation.current) setSynced(new Date());
+      if (v === generation.current && !signal?.aborted) {setSynced(new Date());setError("");return true;}
     } catch (e) {
-      if (v === generation.current)
+      if (v === generation.current && !signal?.aborted)
         setError(e instanceof Error ? e.message : "Could not refresh.");
+      return false;
     } finally {
-      if (v === generation.current) setLoading(false);
+      if (v === generation.current && !signal?.aborted) setLoading(false);
     }
   }, [query]);
-  const lastQuery = useRef(query);
   useEffect(() => {
-    if (lastQuery.current !== query) {
-      setLoading(true);
-      setData(null);
-      lastQuery.current = query;
-    }
-    setSelectedRoom("");
-    void refresh();
+    const controller = new AbortController();
+    queueMicrotask(() => void refresh(controller.signal));
     const timer = setInterval(() => {
-      if (!pending.current && document.visibilityState === "visible")
-        void refresh();
+      if (!pending.current && document.visibilityState === "visible") void refresh(controller.signal);
     }, 15000);
-    return () => {
-      ++generation.current;
-      clearInterval(timer);
-    };
+    return () => { controller.abort(); clearInterval(timer); };
   }, [refresh]);
+  function openGroup(id: string) {
+    ++generation.current;
+    setGroupId(id);
+    setData(null);
+    setLoading(true);
+    setSelectedRoom("");
+    setError("");
+    setSaved("");
+  }
   async function act(payload: Record<string, unknown>, roomAction = false) {
     if (pending.current) return;
+    if (payload.type === "remove_member" && !window.confirm("Remove this resident? Their access ends and the room invitation code changes.")) return false;
+    if (payload.type === "disconnect" && !window.confirm("Disconnect this room from the floor? Floor access ends and chore sharing turns off. Private room data stays with the roommates.")) return false;
     pending.current = true;
     setBusy(true);
     setError("");
@@ -224,11 +238,12 @@ export default function CommunityApp({
       else {
         const result = await communityApi("", payload);
         if (payload.type === "create_group") {
-          setGroupId(result.id);
+          openGroup(result.id);
           setSection("Overview");
+          return true;
         }
       }
-      await refresh();
+      if (!(await refresh())) return false;
       setSaved(
         payload.type === "connect_room"
           ? "Connection requested. Your floor manager must approve it."
@@ -276,9 +291,13 @@ export default function CommunityApp({
     visibleRooms = selectedRoom
       ? rooms.filter((r) => r.id === selectedRoom)
       : rooms;
+  const residentRooms = visibleRooms.map(r => ({ ...r, residents: r.residents.filter(p =>
+    `${r.name} ${r.roomLabel} ${p.name} ${p.bio} ${p.email || ""}`.toLowerCase().includes(residentSearch.trim().toLowerCase()))
+  })).filter(r => !residentSearch.trim() || r.residents.length > 0 || `${r.name} ${r.roomLabel}`.toLowerCase().includes(residentSearch.trim().toLowerCase()));
   const reports = (data?.reports ?? []).filter(
     (r) =>
       (!selectedRoom || r.householdId === selectedRoom) &&
+      (requestStatus === "All" || r.status === requestStatus) &&
       (section === "Maintenance"
         ? r.category === "Maintenance"
         : r.category !== "Maintenance"),
@@ -317,9 +336,9 @@ export default function CommunityApp({
   return (
     <div className="floor-layout">
       <aside className="floor-sidebar">
-        <a
+        <button
+          type="button"
           className="brand"
-          href="/"
           onClick={(e) => {
             e.preventDefault();
             back();
@@ -329,7 +348,7 @@ export default function CommunityApp({
             <Home />
           </span>
           roomie.
-        </a>
+        </button>
         <div className="floor-sidebar-group">
           <Building2 size={20} />
           <div>
@@ -419,7 +438,7 @@ export default function CommunityApp({
               <button
                 className="community-secondary"
                 onClick={() => {
-                  setGroupId("");
+                  openGroup("");
                   setSection("Overview");
                 }}
               >
@@ -454,7 +473,7 @@ export default function CommunityApp({
                       key={g.id}
                       onClick={(e) => {
                         e.preventDefault();
-                        setGroupId(g.id);
+                        openGroup(g.id);
                       }}
                     >
                       <Building2 />
@@ -662,8 +681,13 @@ export default function CommunityApp({
                 </>
               )}
               {section === "Residents" && (
+                <div className="community-stack">
+                  <label className="community-form">Search residents or rooms
+                    <input type="search" value={residentSearch} onChange={e => setResidentSearch(e.target.value)} placeholder="Name, room, or shared email" />
+                  </label>
+                  {!residentRooms.length && <p role="status" className="muted">No residents or rooms match that search.</p>}
                 <div className="resident-grid">
-                  {visibleRooms.map((r) => (
+                  {residentRooms.map((r) => (
                     <section className="panel" key={r.id}>
                       <h2>
                         <Home size={19} />
@@ -733,6 +757,7 @@ export default function CommunityApp({
                       )}
                     </section>
                   ))}
+                </div>
                 </div>
               )}
               {section === "Room & floor rules" && (
@@ -816,6 +841,11 @@ export default function CommunityApp({
                         ? "Visible to the reporting room and its current floor manager."
                         : "Only the author and their current floor manager can read or update each help request."}
                     </p>
+                    <label className="community-form">Filter request status
+                      <select value={requestStatus} onChange={e => setRequestStatus(e.target.value)}>
+                        {["All", "Open", "In progress", "Resolved"].map(status => <option key={status}>{status}</option>)}
+                      </select>
+                    </label>
                     {reports.length ? (
                       reports.map((r) => (
                         <article className="request-card" key={r.id}>
@@ -1229,6 +1259,8 @@ export default function CommunityApp({
           <footer className="community-footer">
             {busy
               ? "Saving…"
+              : error
+                ? "Refresh needed · Last saved data"
               : synced
                 ? `Synced ${synced.toLocaleTimeString()} · Updates every 15 seconds`
                 : initial

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 type Message = {
   id: string;
   body: string;
@@ -20,22 +20,25 @@ export default function RoomMessages({
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [loading, setLoading] = useState(!initialMessages && !demo);
+  const pending = useRef(false), generation = useRef(0);
   useEffect(() => {
     let active = true;
     const load = async () => {
-      if (demo) return;
+      if (demo || pending.current) return;
+      const version = ++generation.current;
       try {
         const r = await fetch("/api/messages?room=" + houseId, {
           cache: "no-store",
         });
         const d = (await r.json()) as { messages: Message[]; error?: string };
         if (!r.ok) throw Error(d.error);
-        if (active) setMessages(d.messages);
+        if (active && version === generation.current) {setMessages(d.messages);setError("");}
       } catch (e) {
         if (active)
           setError(e instanceof Error ? e.message : "Could not load messages.");
-      }
+      } finally { if (active) setLoading(false); }
     };
     void load();
     const timer = setInterval(() => {
@@ -48,7 +51,9 @@ export default function RoomMessages({
   }, [houseId, demo]);
   async function send(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (busy) return;
+    if (pending.current) return;
+    pending.current = true;
+    ++generation.current;
     const form = e.currentTarget,
       body = String(new FormData(form).get("body") || "");
     setBusy(true);
@@ -76,13 +81,15 @@ export default function RoomMessages({
         const read = await fetch("/api/messages?room=" + houseId, {
           cache: "no-store",
         });
-        const result = (await read.json()) as { messages: Message[] };
+        const result = (await read.json()) as { messages?: Message[]; error?: string };
+        if (!read.ok || !result.messages) throw Error("Message sent, but the conversation could not refresh. Refresh before sending again.");
         setMessages(result.messages);
       }
       form.reset();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not send.");
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
@@ -98,6 +105,7 @@ export default function RoomMessages({
           {error}
         </p>
       )}
+      {loading && <p role="status" className="muted">Loading room messages…</p>}
       <div className="community-chat">
         {messages.length ? (
           messages.map((m) => (

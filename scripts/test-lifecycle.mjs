@@ -1,0 +1,75 @@
+import assert from 'node:assert/strict';
+import { randomUUID, randomBytes } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { installRouteHarness } from './test-route-harness.mjs';
+if (!process.env.DATABASE_URL || !process.env.ROOMIE_TEST_DB_HOST || new URL(process.env.DATABASE_URL).hostname !== process.env.ROOMIE_TEST_DB_HOST) throw Error('Select the isolated test branch.');
+const base='http://roomie.lifecycle.test'; await installRouteHarness(base);
+let checks=0; const cases=[]; const run=randomUUID().slice(0,8);
+async function req(session,path,payload,status=200){
+ const res=await fetch(base+path,{method:payload?'POST':'GET',headers:{origin:base,...(payload?{'Content-Type':'application/json'}:{}),...(session.cookie?{cookie:session.cookie}:{})},...(payload?{body:JSON.stringify(payload)}:{})});
+ const cookie=res.headers.getSetCookie().find(c=>c.startsWith('roomie_session=')); if(cookie)session.cookie=cookie.split(';')[0];
+ const data=await res.json();assert.equal(res.status,status,`${path} ${payload?.type||'GET'}: ${JSON.stringify(data)}`);checks++;return data;
+}
+function check(ok,label){assert.ok(ok,label);checks++;cases.push(label);console.log(`PASS ${label}`);}
+async function account(name,role='student') {const session={email:`lifecycle-${name}-${run}@example.com`,password:randomBytes(20).toString('hex')};const d=await req(session,'/api/auth',{type:'signup',name:`QA ${name}`,role,email:session.email,password:session.password},201);session.id=d.user.id;return session;}
+const ra=await account('manager','ra'),a=await account('owner'),b=await account('mate'),c=await account('new-resident');
+const group=await req(ra,'/api/community',{type:'create_group',name:'QA lifecycle floor',building:'Test Hall',floor:'9'},201);
+const assigned=await req(ra,'/api/community',{type:'create_room',groupId:group.id,name:'QA room 901',roomLabel:'901'},201);
+let floor=await req(ra,'/api/community?group='+group.id);let code=floor.rooms.find(r=>r.id===assigned.id).inviteCode;
+await req(a,'/api/rooms',{type:'join',code});await req(b,'/api/rooms',{type:'join',code});
+const help=await req(b,'/api/community',{type:'report',householdId:assigned.id,title:'Membership restricted help',body:'Fictional test request',category:'Private help'},201);
+await req(a,'/api/rooms',{type:'remove_member',householdId:assigned.id,userId:b.id});
+await req(b,'/api/rooms',{type:'join',code},409);
+await req(b,'/api/community',{type:'update_request',reportId:help.id,body:'Former member update'},403);
+check(true,'Removed residents cannot reuse known invitations or update former private-help requests.');
+let rooms=await req(a,'/api/rooms');code=rooms.rooms.find(r=>r.id===assigned.id).inviteCode;
+await req(b,'/api/rooms',{type:'join',code});await req(a,'/api/rooms',{type:'share_chores',householdId:assigned.id,enabled:true});
+await req(a,'/api/rooms',{type:'transfer',householdId:assigned.id,userId:b.id});
+rooms=await req(b,'/api/rooms');check(!rooms.rooms.find(r=>r.id===assigned.id).shareChores && rooms.rooms.find(r=>r.id===assigned.id).inviteCode!==code,'Ownership transfer revokes chore consent and rotates invitations.');
+await req(a,'/api/rooms',{type:'leave',householdId:assigned.id});
+const snapshot=await req(b,'/api/household?id='+assigned.id);
+await req(b,'/api/household?id='+assigned.id,{version:snapshot.version,action:{type:'add_expense',title:'PRIVATE_PREVIOUS_OCCUPANT',cents:100,paidBy:b.id,category:'Other'}});
+await req(b,'/api/messages',{householdId:assigned.id,body:'PRIVATE_PREVIOUS_CHAT'},201);
+rooms=await req(b,'/api/rooms');const oldCode=rooms.rooms.find(r=>r.id===assigned.id).inviteCode;
+await req(b,'/api/rooms',{type:'leave',householdId:assigned.id});
+floor=await req(ra,'/api/community?group='+group.id);const replacement=floor.rooms.find(r=>r.roomLabel==='901');
+check(replacement.id!==assigned.id && replacement.residents.length===0,'A vacated assigned slot gets a fresh household without deleting existing history.');
+await req(c,'/api/rooms',{type:'join',code:oldCode},409);await req(c,'/api/rooms',{type:'join',code:replacement.inviteCode});
+const clean=await req(c,'/api/household?id='+replacement.id);const messages=await req(c,'/api/messages?room='+replacement.id);
+check(clean.state.expenses.length===0 && clean.state.chores.length===0 && messages.messages.length===0,'New occupants cannot inherit former expenses, chores, or private chats.');
+await req(c,'/api/household?id='+assigned.id,undefined,404);
+await req(c,'/api/auth',{type:'delete_account',password:c.password,confirmation:'DELETE'});
+floor=await req(ra,'/api/community?group='+group.id);check(floor.rooms.some(r=>r.roomLabel==='901' && r.residents.length===0 && r.id!==replacement.id),'Deleting a sole resident retains a fresh assigned room for the floor.');
+const independent=await req(a,'/api/rooms',{type:'create',name:'QA pending room'},201);
+rooms=await req(a,'/api/rooms');code=rooms.rooms.find(r=>r.id===independent.id).inviteCode;await req(b,'/api/rooms',{type:'join',code});
+const groups=await req(ra,'/api/community');const floorCode=groups.groups.find(g=>g.id===group.id).inviteCode;
+await req(a,'/api/community',{type:'connect_room',householdId:independent.id,code:floorCode,roomLabel:'912'});
+await req(b,'/api/community',{type:'cancel_connection',householdId:independent.id},403);
+floor=await req(ra,'/api/community?group='+group.id);
+await req(ra,'/api/community',{type:'reject_connection',requestId:floor.connections.find(r=>r.householdId===independent.id).id});
+let pending=await req(a,'/api/community?room='+independent.id);
+check(!pending.group && pending.connections.length===0,'Rejecting a floor request preserves the independent room without granting floor access.');
+await req(a,'/api/community',{type:'connect_room',householdId:independent.id,code:floorCode,roomLabel:'912'});
+
+await req(a,'/api/rooms',{type:'transfer',householdId:independent.id,userId:b.id});
+floor=await req(ra,'/api/community?group='+group.id);check(!floor.connections.some(r=>r.householdId===independent.id),'Ownership transfer cancels stale pending floor connections.');
+check(true,'Non-owners receive an authorization error when cancelling a floor connection.');
+// An existing independent room can take an unclaimed assigned slot after approval.
+const placeholder=await req(ra,'/api/community',{type:'create_room',groupId:group.id,name:'QA room 902',roomLabel:'902'},201);
+floor=await req(ra,'/api/community?group='+group.id);const placeholderCode=floor.rooms.find(r=>r.id===placeholder.id).inviteCode;
+await req(b,'/api/community',{type:'connect_room',householdId:independent.id,code:floorCode,roomLabel:'902'});
+floor=await req(ra,'/api/community?group='+group.id);
+await req(ra,'/api/community',{type:'approve_connection',requestId:floor.connections.find(r=>r.householdId===independent.id).id});
+floor=await req(ra,'/api/community?group='+group.id);
+check(floor.rooms.filter(r=>r.roomLabel==='902').length===1 && floor.rooms.find(r=>r.roomLabel==='902').id===independent.id,'Approval connects an independent room to an unused assigned slot with one directory claim.');
+await req(a,'/api/rooms',{type:'join',code:placeholderCode},409);
+check(true,'Replacing an empty assigned slot revokes its previous student invitation.');
+await req(b,'/api/community',{type:'disconnect',householdId:independent.id});
+const raced=await req(ra,'/api/community',{type:'create_room',groupId:group.id,name:'QA claimed during approval',roomLabel:'903'},201);
+floor=await req(ra,'/api/community?group='+group.id);const raceCode=floor.rooms.find(r=>r.id===raced.id).inviteCode;
+await req(b,'/api/community',{type:'connect_room',householdId:independent.id,code:floorCode,roomLabel:'903'});
+await req(a,'/api/rooms',{type:'join',code:raceCode});
+floor=await req(ra,'/api/community?group='+group.id);
+await req(ra,'/api/community',{type:'approve_connection',requestId:floor.connections.find(r=>r.householdId===independent.id).id},409);
+check(true,'Approval refuses a placeholder claimed after the connection request was submitted.');
+const result={status:'passed',date:new Date().toISOString(),checks,cases};await mkdir('.sites-runtime',{recursive:true});await writeFile('.sites-runtime/lifecycle-test-results.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));

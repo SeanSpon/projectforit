@@ -14,7 +14,7 @@ The original chores, shared expenses, settlements, space reservations, rule prop
 
 Any account can open the floor dashboard and create a group; there is no admin approval or RA activation code. The account role is a preference, not an authorization claim. Floor ownership is explicitly **unverified university RA status**.
 
-A floor manager can create assigned rooms with unique student invitations and remove non-owner residents from connected rooms. Room owners must transfer ownership before removal; floor managers cannot transfer or claim ownership. To bring an existing independent room, its owner submits the separate floor connection code and an assigned room number. The floor manager must explicitly approve. Database uniqueness prevents two rooms claiming the same normalized label in one group. Any resident can disconnect their room; floor managers can disconnect managed rooms. Disconnection and reconnection reset room chore-sharing consent.
+A floor manager can create assigned rooms with unique student invitations and remove non-owner residents from connected rooms. Room owners must transfer ownership before removal; floor managers cannot transfer or claim ownership. To bring an existing independent room, its owner submits the separate floor connection code and an assigned room number. The floor manager must explicitly approve. Database uniqueness prevents two rooms claiming the same normalized label in one group. Approval can replace an empty assigned slot; if a resident claims it first, approval fails safely. Removing or leaving a room invalidates previously shared invitations. Ownership transfer also disables aggregate chore sharing and cancels pending floor requests. When the last resident leaves an assigned room, its previous private history is archived without access and the floor gets a fresh empty room and code. Any resident can disconnect their room; floor managers can disconnect managed rooms. Disconnection and reconnection reset room chore-sharing consent.
 
 The integrated floor dashboard includes overview counts, room directory, resident names/bios and shared contacts, announcements, floor/room rules, maintenance photos/status/updates, private help, invitation management, and connection approvals. The app sends no email/SMS notifications; contact buttons open the device's email/phone application. Requests are internal Roomie records, not official university work orders.
 
@@ -42,7 +42,7 @@ pnpm typecheck
 pnpm run build:vercel
 ```
 
-`db/schema.ts` and `drizzle-neon/` track schema changes. Migrations `0005` through `0007` add floor workflows and guards without resetting existing accounts or private household state. Labels on existing floor links are backfilled; preexisting duplicate labels receive an ID suffix to preserve both links.
+`db/schema.ts` and `drizzle-neon/` track schema changes. Migrations `0005` through `0009` add floor workflows and guards without resetting existing accounts or private household state. Labels on existing floor links are backfilled; preexisting duplicate labels receive an ID suffix to preserve both links.
 
 Vercel uses the checked-in `vercel.json`, Next.js, and the existing production Neon connection. Apply migrations before releasing code. The retained Vinext/Cloudflare development build remains available through `pnpm build`. Do not create another Vercel project or a second Roomie app.
 
@@ -60,4 +60,10 @@ Coverage includes normal signup/login session behavior, independent rooms, assig
 
 ## Limits
 
-No university identity verification, email verification, password-reset email, push/email/SMS delivery, multi-manager floor delegation, individual chore sharing, or official campus maintenance integration. Photos are resized/re-encoded by the client and stored privately in Neon with the request (maximum about 500 KB after encoding). The full browser-to-production flow must be checked separately from the isolated handler integration suite.
+No university identity verification, email verification, password-reset email, push/email/SMS delivery, multi-manager floor delegation, individual chore sharing, or official campus maintenance integration. Photos are resized/re-encoded by the client and stored privately in Neon with the request (maximum about 500 KB after encoding). The full browser-to-production flow is checked separately from the isolated handler integration suite. See `docs/verification-2026-11-05.md` for the exact evidence and remaining verification limits.
+
+## Additional regression and HTTP tests
+
+`node scripts/run-isolated-tests.mjs` accepts hidden-stdin JSON with `url` and optional `suite: "lifecycle"`. The lifecycle suite tests invitation invalidation, vacant-room privacy, pending connection ownership, and empty assigned-slot approval races.
+
+After `pnpm run build:vercel`, `node scripts/run-http-tests.mjs` accepts the same hidden-stdin `url` and starts a production Next.js server on loopback. It runs the full integration suite with real HTTP cookies against that isolated branch, then stops the server. Never supply the production database URL to either test runner.

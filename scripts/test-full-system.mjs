@@ -9,8 +9,9 @@ if (
   new URL(process.env.DATABASE_URL).hostname !== process.env.ROOMIE_TEST_DB_HOST
 )
   throw Error("Use an explicitly selected isolated Neon test branch.");
-const base = "http://roomie.integration.test";
-await installRouteHarness(base);
+const base = process.env.ROOMIE_TEST_BASE_URL || "http://roomie.integration.test";
+if (process.env.ROOMIE_TEST_BASE_URL && !["127.0.0.1", "localhost"].includes(new URL(base).hostname)) throw Error("HTTP destructive tests must use the local isolated-branch server.");
+if (!process.env.ROOMIE_TEST_BASE_URL) await installRouteHarness(base);
 const db = neon(process.env.DATABASE_URL),
   run = randomUUID().slice(0, 8);
 let checks = 0;
@@ -42,6 +43,7 @@ function check(condition, message) {
   assert.ok(condition, message);
   checks++;
   cases.push(message);
+  console.log("PASS " + message);
 }
 async function account(name, role = "student") {
   const s = {
@@ -709,6 +711,7 @@ check(cross.status === 403, "Cross-origin mutations are rejected.");
 await req(mate, "/api/health");
 await mkdir(".sites-runtime", { recursive: true });
 const report = {
+  mode: process.env.ROOMIE_TEST_BASE_URL ? "http-nextjs" : "route-harness",
   date: new Date().toISOString(),
   branch: process.env.ROOMIE_TEST_DB_HOST,
   checks,

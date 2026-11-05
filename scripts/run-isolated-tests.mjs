@@ -15,4 +15,5 @@ const raw = await new Promise((resolve) => {
 const input = JSON.parse(raw);
 process.env.DATABASE_URL = input.url;
 process.env.ROOMIE_TEST_DB_HOST = new URL(input.url).hostname;
-await import("./test-full-system.mjs");
+if (input.base) process.env.ROOMIE_TEST_BASE_URL = input.base;
+await import(input.suite === "lifecycle" ? "./test-lifecycle.mjs" : "./test-full-system.mjs");

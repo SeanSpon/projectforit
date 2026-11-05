@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Home, ArrowRight, Users, ShieldCheck } from "lucide-react";
 import CommunityApp from "@/components/community-app";
 import PortalSwitch, { type Portal } from "@/components/portal-switch";
@@ -76,15 +76,41 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
       active = false;
     };
   }, [initial]);
+  const operation = useRef(false);
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId || demo) return;
+    const url = new URL(window.location.href);
+    const view = url.searchParams.get("view");
+    const section = url.searchParams.get("section");
+    const group = url.searchParams.get("group");
+    url.search = "";
+    if (room) {
+      url.searchParams.set("room", room);
+      if (view) url.searchParams.set("view", view);
+    } else if (community && community !== "ra") {
+      url.searchParams.set("community", community);
+      if (section) url.searchParams.set("section", section);
+    } else if (community === "ra") {
+      url.searchParams.set("portal", "ra");
+      if (group) url.searchParams.set("group", group);
+      if (section) url.searchParams.set("section", section);
+    } else url.searchParams.set("account", "1");
+    window.history.replaceState(null, "", url);
+  }, [userId, room, community, demo]);
   async function loadRooms() {
     const d = await api("/api/rooms");
     setRooms(d.rooms);
   }
   useEffect(() => {
-    if (user) void loadRooms().catch((e) => setError(e.message));
-  }, [user, room, community]);
+    if (!userId) return;
+    let active = true;
+    void api("/api/rooms").then(d => { if (active) setRooms(d.rooms); }).catch(e => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [userId, room, community]);
   async function run(fn: () => Promise<void>) {
-    if (busy) return;
+    if (operation.current) return;
+    operation.current = true;
     setBusy(true);
     setError("");
     setSaved("");
@@ -93,6 +119,7 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save.");
     } finally {
+      operation.current = false;
       setBusy(false);
     }
   }
@@ -109,6 +136,7 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
       setRoom(null);
       setCommunity(null);
       setRooms([]);
+      window.history.replaceState(null, "", "/");
     });
   }
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -122,7 +150,9 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
         ...(mode === "signup" ? { name: f.get("name"), role: portal } : {}),
       });
       setUser(d.user);
-      if (portal === "ra") setCommunity("ra");
+      const next = mode === "signup" ? portal : d.user?.role === "ra" ? "ra" : "student";
+      setPortal(next);
+      setCommunity(next === "ra" ? "ra" : null);
     });
   }
   async function roomSubmit(
@@ -159,6 +189,9 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
     });
   }
   async function roomAction(r: AccountRoom, type: string, extra: object = {}) {
+    if (type === "transfer" && !window.confirm(`Transfer ${r.name} to ${r.members.find(m => m.id === (extra as { userId?: string }).userId)?.name || "this roommate"}? They will manage invitations and ownership. Chore sharing turns off and the invitation code changes.`)) return;
+    if (type === "leave" && !window.confirm(`Leave ${r.name}? You will lose access. If you are its last resident, its private history will not be passed to future residents.`)) return;
+    if (type === "remove_member" && !window.confirm("Remove this roommate? Their access ends and the invitation code changes.")) return;
     await run(async () => {
       await api("/api/rooms", { type, householdId: r.id, ...extra });
       await loadRooms();
@@ -188,8 +221,10 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
       </main>
     );
   if (user && community)
-    return (
+    return (<>
+      {error && <p role="alert" className="community-error">{error}</p>}
       <CommunityApp
+        key={community}
         initial={
           initial?.user?.id === user.id && initial.community === community
             ? initial.floor
@@ -201,9 +236,10 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
         onPortal={switchPortal}
         signOut={() => void signOut()}
       />
-    );
+    </>);
   if (user && room)
-    return (
+    return (<>
+      {error && <p role="alert" className="community-error">{error}</p>}
       <RoomieApp
         initialSnapshot={
           initial?.user?.id === user.id && initial.room === room
@@ -228,7 +264,7 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
         signOut={signOut}
         back={() => setRoom(null)}
       />
-    );
+    </>);
   if (!user)
     return (
       <main className="auth-page">
@@ -306,10 +342,10 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
               : "Already have an account? Sign in"}
           </button>
           <button className="auth-toggle" onClick={() => setDemo(true)}>
-            Try the full demo →
+            Try Demo Mode →
           </button>
           <small>
-            Creating a floor group does not verify university RA status.
+            Demo Mode uses fictional data. Creating a floor group does not verify university RA status.
           </small>
         </section>
       </main>
@@ -317,9 +353,7 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
   return (
     <main className="account-page">
       <header className="account-top">
-        <a className="auth-brand" href="/">
-          ⌂ roomie.
-        </a>
+        <span className="auth-brand">⌂ roomie.</span>
         <PortalSwitch value={portal} onChange={switchPortal} disabled={busy} />
         <button className="community-secondary" onClick={() => void signOut()}>
           Sign out
@@ -620,7 +654,7 @@ export default function RoomieGate({ initial }: { initial?: InitialRoomie }) {
         </div>
       </div>
       <button className="auth-toggle" onClick={() => setDemo(true)}>
-        Explore the demo →
+        Explore Demo Mode →
       </button>
     </main>
   );
