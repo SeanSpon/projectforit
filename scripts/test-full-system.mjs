@@ -212,6 +212,27 @@ await stateAction(student, {
   paidBy: student.id,
   category: "Groceries",
 });
+check(house.state.expenses[0].cents === 4357 && !(house.state.paymentAccounts ?? []).length,
+  "Expenses save without receipt proof or a linked payment account.");
+await stateAction(student, { type: "link_payment_account", provider: "Venmo", handle: "@ROOMIE_PAYMENT_SENTINEL" });
+await stateAction(mate, { type: "link_payment_account", provider: "Cash App", handle: "$RoomieTestMate" });
+check(house.state.paymentAccounts.some(a => a.person === student.id && a.handle === "ROOMIE_PAYMENT_SENTINEL"),
+  "Payment usernames normalize and persist to the authenticated member.");
+await stateAction(student, { type: "link_payment_account", provider: "Venmo", handle: "intrusion", person: mate.id }, 400);
+await stateAction(student, { type: "link_payment_account", provider: "PayPal", handle: "javascript:alert(1)" }, 400);
+await stateAction(mate, { type: "unlink_payment_account" });
+check(house.state.paymentAccounts.length === 1 && house.state.paymentAccounts[0].person === student.id,
+  "A member can remove only their own payment link; unsafe usernames and forged owners are rejected.");
+await stateAction(student, { type: "add_space", name: " Extra   bedroom " });
+await stateAction(mate, { type: "add_space", name: "extra BEDROOM" }, 400);
+await stateAction(mate, { type: "add_booking", title: "Bedroom study", date: today, start: "16:00", end: "17:00", space: "Extra bedroom" });
+await stateAction(student, { type: "add_booking", title: "Bedroom conflict", date: today, start: "16:30", end: "17:30", space: "Extra bedroom" }, 400);
+await stateAction(student, { type: "add_booking", title: "Unknown room", date: today, start: "16:00", end: "17:00", space: "Unregistered room" }, 400);
+const persistedFeatures = await req(mate, "/api/household?id=" + assigned.id);
+check(persistedFeatures.state.spaces.includes("Extra bedroom") && persistedFeatures.state.bookings.some(b => b.space === "Extra bedroom"),
+  "Custom spaces and bookings persist for roommates, with duplicate names and overlapping slots blocked.");
+check(persistedFeatures.members.every(p => !p.email && !p.phone),
+  "Roommate profile contacts default to private in household responses.");
 await stateAction(student, {
   type: "add_chore",
   title: "PRIVATE_CHORE_SENTINEL",
@@ -310,6 +331,9 @@ check(
   contact.email === student.email && contact.phone === "555-0101",
   "Only opted-in contact information is returned to the RA.",
 );
+const roommateContact = (await req(mate, "/api/household?id=" + assigned.id)).members.find(p => p.id === student.id);
+check(roommateContact.email === student.email && roommateContact.phone === "555-0101" && roommateContact.bio === "IT student",
+  "Roommate profiles return the current bio and explicitly shared contact details.");
 await req(student, "/api/auth", {
   type: "profile",
   name: "QA resident",
@@ -322,6 +346,8 @@ check(
   data.rooms[0].residents.every((r) => !r.email && !r.phone),
   "Revoking contact sharing removes it from subsequent RA responses.",
 );
+check((await req(mate, "/api/household?id=" + assigned.id)).members.every(p => !p.email && !p.phone),
+  "Revoked contact details disappear from subsequent roommate profile responses.");
 await req(
   mate,
   "/api/rooms",

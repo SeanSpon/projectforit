@@ -23,16 +23,23 @@ export async function readHouse(id: string, userId: string) {
     );
   if (!house) return null;
   const members = await db
-    .select({ id: users.person, name: users.name, bio: users.bio })
+    .select({
+      id: users.person, name: users.name, bio: users.bio,
+      email: sql<string | null>`CASE WHEN ${users.shareEmail} THEN ${users.email} ELSE NULL END`,
+      phone: sql<string | null>`CASE WHEN ${users.sharePhone} THEN NULLIF(${users.phone}, '') ELSE NULL END`,
+    })
     .from(memberships)
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(eq(memberships.householdId, id))
     .orderBy(memberships.joinedAt, users.id);
   return {
-    state: house.state,
+    state: {
+      ...house.state,
+      paymentAccounts: house.state.paymentAccounts?.filter(account => members.some(member => member.id === account.person)),
+    },
     version: house.version,
     household: { id: house.id, name: house.name, inviteCode: house.inviteCode },
-    members: members.map((p, i) => profilePerson(p.id, p.name, i, p.bio)),
+    members: members.map((p, i) => ({ ...profilePerson(p.id, p.name, i, p.bio), email: p.email, phone: p.phone })),
   };
 }
 

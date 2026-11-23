@@ -8,13 +8,23 @@ export const people = [
 ];
 export type View = "Overview" | "Chores" | "Expenses" | "Shared spaces" | "House rules" | "Messages" | "How to use";
 export type Chore = { id: string; title: string; person: string; date: string; area: string; minutes: number; done: boolean };
-export type Person = { id: string; name: string; initials: string; color: string; bio?: string };
+export type Person = { id: string; name: string; initials: string; color: string; bio?: string; email?: string | null; phone?: string | null };
 export const profilePerson = (id: string, name: string, index = 0, bio = ""): Person => ({ id, name, initials: name.split(/\s+/).map(p => p[0]).join("").slice(0,2).toUpperCase(), color: ["lime","blue","pink","peach"][index % 4], bio });
 export type Expense = { id: string; title: string; cents: number; paidBy: string; category: string; date: string; settledBy: string[]; participants?: string[] };
 export type Booking = { id: string; title: string; space: string; person: string; date: string; start: string; end: string };
 export type Rule = { id: string; title: string; detail: string; votes: string[]; category: string };
 export type Activity = { id: string; person: string; text: string; when: string };
-export type HouseState = { chores: Chore[]; expenses: Expense[]; bookings: Booking[]; rules: Rule[]; activity: Activity[] };
+export const DEFAULT_SPACES = ["Living room", "Kitchen", "Study nook"];
+export const PAYMENT_PROVIDERS = ["Venmo", "Cash App", "PayPal"] as const;
+export type PaymentAccount = { person: string; provider: typeof PAYMENT_PROVIDERS[number]; handle: string };
+export type HouseState = { chores: Chore[]; expenses: Expense[]; bookings: Booking[]; rules: Rule[]; activity: Activity[]; spaces?: string[]; paymentAccounts?: PaymentAccount[] };
+export const householdSpaces = (state: HouseState) => [...new Set([...DEFAULT_SPACES, ...(state.spaces ?? [])])];
+export function paymentAccountUrl(account: PaymentAccount) {
+  const handle = encodeURIComponent(account.handle);
+  if (account.provider === "Venmo") return `https://venmo.com/u/${handle}`;
+  if (account.provider === "Cash App") return `https://cash.app/$${handle}`;
+  return `https://www.paypal.com/paypalme/${handle}`;
+}
 export type Snapshot = { state: HouseState; version: number; household: { id: string; name: string; inviteCode: string }; members: Person[] };
 export const emptyState = (): HouseState => ({ chores: [], expenses: [], bookings: [], rules: [], activity: [] });
 export function demoSnapshot(): Snapshot {
@@ -24,7 +34,8 @@ export function demoSnapshot(): Snapshot {
   state.chores.forEach(c => c.date = shift(c.date));
   state.bookings.forEach(b => b.date = shift(b.date));
   state.expenses.forEach(e => { e.date = shift(e.date); e.participants = people.map(p => p.id); });
-  return { state, version: 0, members: people, household: { id: "demo", name: "Maple House", inviteCode: "DEMO" } };
+  const bios = ["IT student and early riser. Always up for a house movie night.", "Design student, coffee enthusiast, and the house playlist curator.", "Biology student. Loves cooking, plants, and a tidy kitchen.", "Music student and the resident movie-night organizer."];
+  return { state, version: 0, members: people.map((p, i) => ({ ...p, bio: bios[i] })), household: { id: "demo", name: "Maple House", inviteCode: "DEMO" } };
 }
 export const seedState: HouseState = {
   chores: [
