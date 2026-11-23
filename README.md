@@ -8,6 +8,10 @@ Create a normal account, create an independent room, or join an assigned room wi
 
 The original chores, shared expenses, settlements, space reservations, rule proposals/votes, profiles, and demo remain. Private roommate messages are under **Messages**. Only current roommates can read private household data; a connected floor manager cannot join a managed room using its code.
 
+**Expenses** includes **Link payment account** for a Venmo, Cash App, or PayPal.Me public username. Each member manages their own household repayment link. Purchases can be recorded without a receipt or linked account; links do not verify payments, connect banks, or transfer money.
+
+**Shared spaces** includes **Add a room or space**, supporting custom bedrooms and other reservable spaces alongside the three defaults (up to 32 total). Duplicate names and overlapping reservations in the same space are rejected by the server. Click any name under **Your people** to view that roommate’s bio, chore/reservation counts, and explicitly shared contact details. Profiles refresh from the current household response; email and phone remain hidden by default.
+
 **Rooms & profile** contains contact-sharing choices, role correction, room management, and permanent account deletion. Transfer shared rooms before deleting their owner account. Account deletion removes sessions, profile, authored requests/messages, and solo-owned rooms. Deleting a floor owner disbands their groups while preserving occupied student rooms and their private state.
 
 ## Optional floor groups
